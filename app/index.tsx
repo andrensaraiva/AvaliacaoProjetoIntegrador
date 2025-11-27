@@ -355,11 +355,12 @@ const App = () => {
   
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const structureSyncError = useRef(false);
-  const hasBootstrappedRemote = useRef(false);
+  const [structureSyncReady, setStructureSyncReady] = useState(!isFirebaseConfigured);
+  const hasSyncedNonEmptyStructure = useRef((events.length + groups.length + criteria.length) > 0);
 
   // --- Effects ---
   useEffect(() => {
-    if (!isFirebaseConfigured || hasBootstrappedRemote.current) return;
+    if (!isFirebaseConfigured || structureSyncReady) return;
     let isMounted = true;
 
     const bootstrapFromFirebase = async () => {
@@ -378,9 +379,9 @@ const App = () => {
             criteria?: Criterion[];
           };
 
-          if (Array.isArray(remoteEvents) && remoteEvents.length) setEvents(remoteEvents);
-          if (Array.isArray(remoteGroups) && remoteGroups.length) setGroups(remoteGroups);
-          if (Array.isArray(remoteCriteria) && remoteCriteria.length) setCriteria(remoteCriteria);
+          if (Array.isArray(remoteEvents)) setEvents(remoteEvents);
+          if (Array.isArray(remoteGroups)) setGroups(remoteGroups);
+          if (Array.isArray(remoteCriteria)) setCriteria(remoteCriteria);
         }
 
         if (evaluationsSnapshot) {
@@ -397,7 +398,9 @@ const App = () => {
       } catch (error) {
         console.warn('Falha ao carregar dados do Firebase', error);
       } finally {
-        hasBootstrappedRemote.current = true;
+        if (isMounted) {
+          setStructureSyncReady(true);
+        }
       }
     };
 
@@ -405,7 +408,7 @@ const App = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [structureSyncReady, isFirebaseConfigured]);
 
   useEffect(() => { localStorage.setItem('v5_api_events', JSON.stringify(events)); }, [events]);
   useEffect(() => { localStorage.setItem('v5_api_groups', JSON.stringify(groups)); }, [groups]);
@@ -438,7 +441,17 @@ const App = () => {
   };
 
   useEffect(() => {
-    if (!isFirebaseConfigured) return;
+    if (!isFirebaseConfigured || !structureSyncReady) return;
+
+    const hasData = events.length > 0 || groups.length > 0 || criteria.length > 0;
+    if (!hasData && !hasSyncedNonEmptyStructure.current) {
+      return;
+    }
+
+    if (hasData) {
+      hasSyncedNonEmptyStructure.current = true;
+    }
+
     syncStructureSnapshot({ events, groups, criteria })
       .then(() => {
         structureSyncError.current = false;
@@ -450,7 +463,7 @@ const App = () => {
           structureSyncError.current = true;
         }
       });
-  }, [events, groups, criteria]);
+  }, [events, groups, criteria, structureSyncReady]);
 
   // --- Helpers ---
   const calculateGroupScore = (groupId: string, eventId: string) => {
