@@ -89,6 +89,7 @@ type Evaluation = {
   evaluatorName: string;
   scores: Record<string, number>; // criterionId -> score (0-10)
   individualScores: Record<string, number>; // memberId -> score (0-10)
+  groupComment?: string;
   timestamp: number;
 };
 
@@ -859,6 +860,14 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
             const score = calculateGroupScore(group.id);
             const isExpanded = expandedGroup === group.id;
             const groupEvals = evaluations.filter((e: Evaluation) => e.groupId === group.id);
+            const groupComments = groupEvals
+              .filter((e: Evaluation) => e.groupComment && e.groupComment.trim().length > 0)
+              .map((e: Evaluation) => ({
+                id: e.id,
+                text: e.groupComment!.trim(),
+                evaluator: e.evaluatorName || 'Avaliador',
+                timestamp: e.timestamp
+              }));
             
             return (
               <div key={group.id} className={`rounded-xl shadow-sm border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
@@ -948,6 +957,27 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
                       </div>
                     )}
 
+                    {/* Evaluator Comments */}
+                    <div className="mt-6 space-y-3">
+                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Comentários dos Avaliadores</h4>
+                      {groupComments.length > 0 ? (
+                        groupComments.map((comment) => {
+                          const commentDate = new Date(comment.timestamp).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                          return (
+                            <div key={comment.id} className={`p-3 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                              <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                                <span className={darkMode ? 'text-slate-300' : 'text-slate-600'}>{comment.evaluator}</span>
+                                <span className={darkMode ? 'text-slate-500' : 'text-slate-400'}>{commentDate}</span>
+                              </div>
+                              <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{comment.text}</p>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Nenhum comentário registrado para este grupo.</p>
+                      )}
+                    </div>
+
                     {/* AI Feedback */}
                     <div className={`mt-6 pt-4 border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                       {!aiFeedback ? (
@@ -996,6 +1026,7 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
   const [evaluatorName, setEvaluatorName] = useState('');
   const [scores, setScores] = useState<Record<string, number>>({});
   const [indivScores, setIndivScores] = useState<Record<string, number>>({});
+  const [groupComment, setGroupComment] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
 
   const selectedGroup = groups.find((g: Group) => g.id === selectedGroupId);
@@ -1016,6 +1047,8 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
       return;
     }
 
+    const normalizedComment = groupComment.trim();
+
     const evaluation: Evaluation = {
       id: Date.now().toString(),
       eventId: activeEventId,
@@ -1023,6 +1056,7 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
       evaluatorName,
       scores,
       individualScores: indivScores,
+      groupComment: normalizedComment || undefined,
       timestamp: Date.now()
     };
     
@@ -1032,6 +1066,7 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     setSelectedGroupId('');
     setScores({});
     setIndivScores({});
+    setGroupComment('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast('success', 'Sucesso! Avaliação salva com sucesso.');
     showModal('success', 'Avaliação registrada!', `As notas foram salvas e estarão disponíveis para o administrador revisar. ${getFirebaseConfirmationText()}`);
@@ -1163,6 +1198,7 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
                             return;
                         }
                         setSelectedGroupId(g.id);
+                        setGroupComment('');
                     }}
                     className={`text-left p-5 rounded-xl border transition-all shadow-sm hover:shadow-md active:scale-[0.98] ${
                       isEvaluated 
@@ -1195,7 +1231,10 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
         <div className="animate-in slide-in-from-right-4 space-y-8">
           
           <button 
-            onClick={() => setSelectedGroupId('')}
+            onClick={() => {
+              setSelectedGroupId('');
+              setGroupComment('');
+            }}
             className={`flex items-center gap-2 font-medium transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'}`}
           >
             <ArrowLeft size={20} /> Voltar para Grupos
@@ -1298,6 +1337,22 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
                 </div>
              </div>
           )}
+
+          {/* Group Comments */}
+          <div className={`p-5 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide">Comentários do Avaliador</h3>
+              <span className={`text-xs font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Opcional</span>
+            </div>
+            <textarea
+              rows={4}
+              value={groupComment}
+              onChange={(e) => setGroupComment(e.target.value)}
+              placeholder="Compartilhe percepções qualitativas sobre este grupo."
+              className={`w-full p-3 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${darkMode ? 'bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600' : 'bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400'}`}
+            />
+            <p className={`text-xs mt-2 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Esses comentários aparecerão na aba de resultados junto com as notas.</p>
+          </div>
 
           <button 
             onClick={handleSubmit}
