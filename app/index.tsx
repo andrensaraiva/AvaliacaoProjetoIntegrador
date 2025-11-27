@@ -48,7 +48,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
-import { syncEvaluationToFirebase, syncStructureSnapshot, isFirebaseConfigured } from './firebaseClient';
+import { syncEvaluationToFirebase, syncStructureSnapshot, isFirebaseConfigured, fetchStructureSnapshot, fetchEvaluationsSnapshot } from './firebaseClient';
 
 // --- Types ---
 
@@ -295,6 +295,21 @@ const generateDefaultCriteria = (eventId: string): Criterion[] => [
   }
 ];
 
+const flattenEvaluationsTree = (tree: Record<string, any> | null | undefined): Evaluation[] => {
+  if (!tree) return [];
+  const result: Evaluation[] = [];
+  Object.values(tree).forEach((groupsByEvent: any) => {
+    Object.values(groupsByEvent || {}).forEach((evaluationsByGroup: any) => {
+      Object.values(evaluationsByGroup || {}).forEach((evaluation: any) => {
+        if (evaluation) {
+          result.push(evaluation as Evaluation);
+        }
+      });
+    });
+  });
+  return result;
+};
+
 // --- App Component ---
 
 const App = () => {
@@ -339,8 +354,59 @@ const App = () => {
   const [adminView, setAdminView] = useState<AdminView>('dashboard');
   
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const structureSyncError = useRef(false);
+  const hasBootstrappedRemote = useRef(false);
 
   // --- Effects ---
+  useEffect(() => {
+    if (!isFirebaseConfigured || hasBootstrappedRemote.current) return;
+    let isMounted = true;
+
+    const bootstrapFromFirebase = async () => {
+      try {
+        const [structureSnapshot, evaluationsSnapshot] = await Promise.all([
+          fetchStructureSnapshot(),
+          fetchEvaluationsSnapshot(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (structureSnapshot) {
+          const { events: remoteEvents, groups: remoteGroups, criteria: remoteCriteria } = structureSnapshot as {
+            events?: Event[];
+            groups?: Group[];
+            criteria?: Criterion[];
+          };
+
+          if (Array.isArray(remoteEvents) && remoteEvents.length) setEvents(remoteEvents);
+          if (Array.isArray(remoteGroups) && remoteGroups.length) setGroups(remoteGroups);
+          if (Array.isArray(remoteCriteria) && remoteCriteria.length) setCriteria(remoteCriteria);
+        }
+
+        if (evaluationsSnapshot) {
+          const flattened = flattenEvaluationsTree(evaluationsSnapshot);
+          if (flattened.length) {
+            setEvaluations((prev) => {
+              const merged = new Map<string, Evaluation>();
+              prev.forEach((evaluation) => merged.set(evaluation.id, evaluation));
+              flattened.forEach((evaluation) => merged.set(evaluation.id, evaluation));
+              return Array.from(merged.values());
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Falha ao carregar dados do Firebase', error);
+      } finally {
+        hasBootstrappedRemote.current = true;
+      }
+    };
+
+    bootstrapFromFirebase();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   useEffect(() => { localStorage.setItem('v5_api_events', JSON.stringify(events)); }, [events]);
   useEffect(() => { localStorage.setItem('v5_api_groups', JSON.stringify(groups)); }, [groups]);
   useEffect(() => { localStorage.setItem('v5_api_criteria', JSON.stringify(criteria)); }, [criteria]);

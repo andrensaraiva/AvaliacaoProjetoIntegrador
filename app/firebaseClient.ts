@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getDatabase, ref, set, type Database } from 'firebase/database';
+import { getDatabase, ref, set, get, type Database } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -56,4 +56,20 @@ export const syncEvaluationToFirebase = async (evaluation: any) => {
     ...evaluation,
     syncedAt: Date.now(),
   });
+};
+
+export const fetchStructureSnapshot = async () => {
+  const db = getRealtimeDb();
+  if (!db) return null;
+  const snapshot = await get(ref(db, 'structure'));
+  if (!snapshot.exists()) return null;
+  return snapshot.val();
+};
+
+export const fetchEvaluationsSnapshot = async () => {
+  const db = getRealtimeDb();
+  if (!db) return null;
+  const snapshot = await get(ref(db, 'evaluations'));
+  if (!snapshot.exists()) return null;
+  return snapshot.val();
 };
