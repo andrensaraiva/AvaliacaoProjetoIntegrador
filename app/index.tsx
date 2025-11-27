@@ -1551,31 +1551,37 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
                            {criterion.description}
                         </p>
                     )}
-                    
-                             {member.icon ? <DynamicIcon name={member.icon} size={16}/> : <User size={16}/>}
-                           </div>
-                           <span className={`font-semibold truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{member.name}</span>
-                         </div>
-                             <div className={`rounded px-2 py-1 text-center min-w-[2.5rem] ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                                <span className={`font-bold ${indivScores[member.id] !== undefined ? (darkMode ? 'text-violet-300' : 'text-indigo-600') : (darkMode ? 'text-slate-600' : 'text-slate-300')}`}>
-                              {indivScores[member.id] ?? '-'}
-                            </span>
-                         </div>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="10" 
-                        step="0.5"
-                        className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${darkMode ? 'accent-violet-400 bg-slate-800' : 'accent-slate-400 hover:accent-indigo-500 bg-slate-100'}`}
-                        value={indivScores[member.id] ?? 0}
-                        onChange={(e) => setIndivScores({...indivScores, [member.id]: parseFloat(e.target.value)})}
-                      />
+                    {!activeInfo && (
+                       <p className="text-xs text-slate-400 line-clamp-2">{criterion.description}</p>
+                    )}
+                  </div>
+
+                  <div className="mt-auto">
+                    <div className="flex justify-between items-center mb-2">
+                         <span className="text-xs font-bold text-slate-400 uppercase">Nota</span>
+                      <span className={`text-xl font-bold ${scores[criterion.id] !== undefined ? (darkMode ? 'text-violet-300' : 'text-indigo-600') : (darkMode ? 'text-slate-700' : 'text-slate-300')}`}>
+                            {scores[criterion.id] ?? '-'}
+                         </span>
                     </div>
-                  ))}
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="10" 
+                      step="0.5"
+                      className={`w-full h-3 rounded-lg appearance-none cursor-pointer ${darkMode ? 'accent-violet-400 bg-slate-800' : 'accent-indigo-600 bg-slate-100'}`}
+                      value={scores[criterion.id] ?? 0}
+                      onChange={(e) => setScores({...scores, [criterion.id]: parseFloat(e.target.value)})}
+                    />
+                     <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
+                        <span>0</span>
+                        <span>5</span>
+                        <span>10</span>
+                     </div>
+                  </div>
                 </div>
-             </div>
-          )}
+              ))}
+                </div>
+          </div>
 
           {/* Group Comments */}
           <div className={`p-5 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
