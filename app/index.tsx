@@ -57,6 +57,7 @@ type Event = {
   name: string;
   date: string; // YYYY-MM-DD
   icon?: string;
+  responseDeadline?: string; // YYYY-MM-DD
   description?: string;
 };
 
@@ -308,6 +309,20 @@ const flattenEvaluationsTree = (tree: Record<string, any> | null | undefined): E
     });
   });
   return result;
+};
+
+const getEventDeadline = (event: Event) => event.responseDeadline || event.date;
+
+const isEventClosed = (event: Event) => {
+  const deadline = getEventDeadline(event);
+  if (!deadline) return false;
+  const deadlineDate = new Date(`${deadline}T23:59:59`);
+  return deadlineDate.getTime() < Date.now();
+};
+
+const formatDate = (isoDate?: string) => {
+  if (!isoDate) return '-';
+  return new Date(`${isoDate}T12:00:00`).toLocaleDateString('pt-BR');
 };
 
 // --- App Component ---
@@ -813,6 +828,19 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
     return [...events].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [events]);
 
+  const { ongoingEvents, pastEvents } = useMemo(() => {
+    const ongoing: Event[] = [];
+    const past: Event[] = [];
+    sortedEvents.forEach((evt: Event) => {
+      if (isEventClosed(evt)) {
+        past.push(evt);
+      } else {
+        ongoing.push(evt);
+      }
+    });
+    return { ongoingEvents: ongoing, pastEvents: past };
+  }, [sortedEvents]);
+
   // Sort groups by score descending
   const sortedGroups = useMemo(() => {
     return [...groups].sort((a: Group, b: Group) => {
@@ -866,65 +894,121 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
   // 1. EVENT SELECTION (Cards for Dashboard)
   if (!activeEventId) {
     return (
-      <div className="animate-in fade-in space-y-4">
-        <div className={`p-4 rounded-xl border mb-6 flex items-start gap-3 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
-           <Info className="text-slate-500 shrink-0 mt-1" size={20} />
-           <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Selecione um evento abaixo para visualizar o ranking, as notas detalhadas e gerar feedback com IA.</p>
+      <div className="animate-in fade-in space-y-6">
+        <div className={`p-4 rounded-xl border flex items-start gap-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+           <Info className="text-slate-500 shrink-0 mt-0.5" size={20} />
+           <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Escolha um evento em andamento para acompanhar resultados ao vivo. Eventos finalizados permanecem disponíveis abaixo para consulta.</p>
         </div>
 
-        <h3 className={`text-sm font-bold uppercase tracking-wide px-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Selecione o Evento</h3>
-        <div className="grid grid-cols-1 gap-4">
-           {sortedEvents.map((e: Event) => (
-             <button
-               key={e.id}
-               onClick={() => setActiveEventId(e.id)}
-               className={`p-6 rounded-xl shadow-sm border transition-all text-left flex items-start gap-4 group ${
-                 darkMode 
-                   ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' 
-                   : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md'
-               }`}
-             >
-               <div className={`p-3 rounded-xl transition-colors w-16 h-16 flex items-center justify-center shrink-0 ${
-                 darkMode 
-                   ? 'bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white' 
-                   : 'bg-slate-100 text-slate-600 group-hover:bg-slate-800 group-hover:text-white'
-               }`}>
-                 {e.icon ? <DynamicIcon name={e.icon} size={28} /> : <BarChart3 size={28} />}
-               </div>
-               <div className="flex-1">
-                 <div className="flex justify-between items-start">
-                    <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{e.name}</h3>
-                    <span className={`text-xs px-2 py-1 rounded font-medium ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                        {new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                    </span>
-                 </div>
-                 <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Ver resultados e ranking</p>
-               </div>
-             </button>
-           ))}
-        </div>
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className={`text-sm font-bold uppercase tracking-wide px-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Eventos acontecendo</h3>
+            <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>{ongoingEvents.length}</span>
+          </div>
+          {ongoingEvents.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {ongoingEvents.map((e: Event) => (
+                <button
+                  key={e.id}
+                  onClick={() => setActiveEventId(e.id)}
+                  className={`p-6 rounded-xl shadow-sm border transition-all text-left flex items-start gap-4 group ${
+                    darkMode 
+                      ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' 
+                      : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md'
+                  }`}
+                >
+                  <div className={`p-3 rounded-xl transition-colors w-16 h-16 flex items-center justify-center shrink-0 ${
+                    darkMode 
+                      ? 'bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white' 
+                      : 'bg-slate-100 text-slate-600 group-hover:bg-slate-800 group-hover:text-white'
+                  }`}>
+                    {e.icon ? <DynamicIcon name={e.icon} size={28} /> : <BarChart3 size={28} />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{e.name}</h3>
+                      <span className={`text-xs px-2 py-1 rounded font-medium ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                        {formatDate(getEventDeadline(e))}
+                      </span>
+                    </div>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Prazo para respostas</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={`p-6 rounded-xl border text-center text-sm ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-500'}`}>
+              Nenhum evento ativo neste momento.
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className={`text-sm font-bold uppercase tracking-wide px-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Eventos finalizados</h3>
+            <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>{pastEvents.length}</span>
+          </div>
+          {pastEvents.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {pastEvents.map((e: Event) => (
+                <button
+                  key={e.id}
+                  onClick={() => setActiveEventId(e.id)}
+                  className={`p-6 rounded-xl border text-left flex items-start gap-4 ${darkMode ? 'bg-slate-900 border-slate-800 hover:border-red-400/40' : 'bg-white border-slate-200 hover:border-red-200'} transition-all`}
+                >
+                  <div className={`p-3 rounded-xl w-16 h-16 flex items-center justify-center shrink-0 ${darkMode ? 'bg-slate-800 text-red-300' : 'bg-red-50 text-red-600'}`}>
+                    {e.icon ? <DynamicIcon name={e.icon} size={28} /> : <Calendar size={28} />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start">
+                      <h3 className={`text-lg font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{e.name}</h3>
+                      <span className={`text-xs px-2 py-1 rounded font-medium ${darkMode ? 'bg-red-500/10 text-red-300' : 'bg-red-50 text-red-600'}`}>Encerrado</span>
+                    </div>
+                    <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Prazo encerrado em <span className="font-semibold">{formatDate(getEventDeadline(e))}</span></p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={`p-6 rounded-xl border text-center text-sm ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-500'}`}>
+              Ainda não há eventos finalizados.
+            </div>
+          )}
+        </section>
       </div>
     );
   }
 
   // 2. RESULTS DISPLAY
   const currentEvent = events.find((e: Event) => e.id === activeEventId);
+  const currentEventClosed = currentEvent ? isEventClosed(currentEvent) : false;
+  const currentEventDeadline = currentEvent ? getEventDeadline(currentEvent) : null;
   
   return (
     <div>
-      <div className={`flex justify-between items-center mb-6 p-4 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 p-4 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
          <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Ranking do Evento</label>
             <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{currentEvent?.name}</h2>
+            {currentEventDeadline && (
+              <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Prazo para respostas: <span className="font-semibold">{formatDate(currentEventDeadline)}</span>
+              </p>
+            )}
          </div>
-         <button 
-           onClick={() => setActiveEventId(null)}
-           className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-             darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-           }`}
-         >
-           <ArrowLeft size={14} /> Outros Eventos
-         </button>
+         <div className="flex items-center gap-2">
+           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${currentEventClosed ? (darkMode ? 'bg-red-500/10 text-red-300' : 'bg-red-50 text-red-600') : (darkMode ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-600')}`}>
+             {currentEventClosed ? 'Evento encerrado' : 'Evento em andamento'}
+           </span>
+           <button 
+             onClick={() => setActiveEventId(null)}
+             className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors flex items-center gap-1 ${
+               darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+             }`}
+           >
+             <ArrowLeft size={14} /> Outros Eventos
+           </button>
+         </div>
       </div>
 
       {groups.length === 0 ? (
@@ -1116,6 +1200,19 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     if (savedName) setEvaluatorName(savedName);
   }, []);
 
+  const handleEventSelection = (event: Event) => {
+    if (isEventClosed(event)) {
+      showToast('info', 'Prazo encerrado! Este evento não aceita mais avaliações.');
+      return;
+    }
+    setActiveEventId(event.id);
+    setSelectedGroupId('');
+    setScores({});
+    setIndivScores({});
+    setGroupComment('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = () => {
     if (!evaluatorName.trim()) {
       showToast('error', 'Ops! Informe seu nome para continuar.');
@@ -1123,6 +1220,15 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     }
     if (!selectedGroupId) {
       showToast('error', 'Ops! Escolha um grupo para enviar a avaliação.');
+      return;
+    }
+    if (!activeEvent || isEventClosed(activeEvent)) {
+      showToast('error', 'Prazo encerrado! Este evento não aceita mais novas avaliações.');
+      setActiveEventId(null);
+      setSelectedGroupId('');
+      setScores({});
+      setIndivScores({});
+      setGroupComment('');
       return;
     }
 
@@ -1155,6 +1261,19 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     return [...events].sort((a: Event, b: Event) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [events]);
 
+  const { ongoingEvents, pastEvents } = useMemo(() => {
+    const ongoing: Event[] = [];
+    const past: Event[] = [];
+    sortedEvents.forEach((evt: Event) => {
+      if (isEventClosed(evt)) {
+        past.push(evt);
+      } else {
+        ongoing.push(evt);
+      }
+    });
+    return { ongoingEvents: ongoing, pastEvents: past };
+  }, [sortedEvents]);
+
   const accentCardBg = darkMode ? 'bg-violet-500/15 border-violet-500/30' : 'bg-white border-slate-200';
   const accentIconBg = darkMode ? 'bg-violet-500/20 text-violet-200' : 'bg-indigo-100 text-indigo-600';
   const accentIconHover = darkMode ? 'group-hover:bg-violet-500 group-hover:text-white' : 'group-hover:bg-indigo-600 group-hover:text-white';
@@ -1162,6 +1281,8 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
   const accentButton = darkMode ? 'bg-violet-500 hover:bg-violet-600' : 'bg-indigo-600 hover:bg-indigo-700';
   const accentText = darkMode ? 'text-violet-300' : 'text-indigo-500';
   const accentHoverBorder = darkMode ? 'hover:border-violet-500' : 'hover:border-indigo-500';
+  const activeEventClosed = activeEvent ? isEventClosed(activeEvent) : false;
+  const activeEventDeadline = activeEvent ? getEventDeadline(activeEvent) : null;
 
   if (events.length === 0) {
     return (
@@ -1178,41 +1299,97 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     );
   }
 
-  // 1. EVENT SELECTION SCREEN
   if (!activeEventId) {
     return (
-      <div className="animate-in fade-in space-y-4">
-        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide px-1">Selecione o Evento</h3>
-        <div className="grid grid-cols-1 gap-4">
-           {sortedEvents.map((e: Event) => (
-             <button
-               key={e.id}
-               onClick={() => setActiveEventId(e.id)}
-               className={`p-6 rounded-xl shadow-sm border transition-all text-left flex items-start gap-4 group ${
-                darkMode 
-                  ? 'bg-slate-900 border-slate-800 ' + accentHoverBorder
-                  : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md'
-              }`}
-             >
-               <div className={`p-3 rounded-xl transition-colors w-16 h-16 flex items-center justify-center shrink-0 ${
-                darkMode 
-                  ? 'bg-violet-500/25 text-violet-200 ' + accentIconHover
-                  : 'bg-indigo-100 text-indigo-600 ' + accentIconHover
-              }`}>
-                 {e.icon ? <DynamicIcon name={e.icon} size={28} /> : <Calendar size={28} />}
-               </div>
-               <div className="flex-1">
-                 <div className="flex justify-between items-start">
-                    <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{e.name}</h3>
-                    <span className={`text-xs px-2 py-1 rounded font-medium ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                        {new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                    </span>
-                 </div>
-                 <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Toque para avaliar projetos deste evento</p>
-               </div>
-             </button>
-           ))}
+      <div className="animate-in fade-in space-y-6">
+        <div className={`p-4 rounded-xl border flex items-start gap-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <Info className="text-slate-500 shrink-0 mt-0.5" size={20} />
+          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            Escolha um evento em andamento para registrar notas. Eventos com prazo encerrado aparecem em “Eventos passados” e ficam bloqueados para novas avaliações.
+          </p>
         </div>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className={`text-sm font-bold uppercase tracking-wide px-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Eventos em andamento</h3>
+            <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>{ongoingEvents.length} disponíveis</span>
+          </div>
+          {ongoingEvents.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {ongoingEvents.map((event: Event) => {
+                const deadlineLabel = formatDate(getEventDeadline(event));
+                return (
+                  <button
+                    key={event.id}
+                    onClick={() => handleEventSelection(event)}
+                    className={`p-6 rounded-xl shadow-sm border transition-all text-left flex items-start gap-4 group ${
+                      darkMode 
+                        ? 'bg-slate-900 border-slate-800 hover:border-indigo-500' 
+                        : 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md'
+                    }`}
+                  >
+                    <div className={`p-3 rounded-xl transition-colors w-16 h-16 flex items-center justify-center shrink-0 ${
+                      darkMode 
+                        ? 'bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white' 
+                        : 'bg-slate-100 text-slate-600 group-hover:bg-slate-800 group-hover:text-white'
+                    }`}>
+                      {event.icon ? <DynamicIcon name={event.icon} size={28} /> : <BarChart3 size={28} />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{event.name}</h3>
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                          {formatDate(event.date)}
+                        </span>
+                      </div>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Prazo para respostas: <span className="font-semibold">{deadlineLabel}</span></p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={`p-6 rounded-xl border text-center text-sm ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-500'}`}>
+              Nenhum evento aberto no momento.
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className={`text-sm font-bold uppercase tracking-wide px-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Eventos passados</h3>
+            <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>{pastEvents.length}</span>
+          </div>
+          {pastEvents.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {pastEvents.map((event: Event) => {
+                const deadlineLabel = formatDate(getEventDeadline(event));
+                return (
+                  <button
+                    key={event.id}
+                    onClick={() => handleEventSelection(event)}
+                    className={`p-6 rounded-xl border text-left flex items-start gap-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} cursor-not-allowed opacity-70`}
+                  >
+                    <div className={`p-3 rounded-xl w-16 h-16 flex items-center justify-center shrink-0 ${darkMode ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
+                      {event.icon ? <DynamicIcon name={event.icon} size={28} /> : <Calendar size={28} />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className={`text-lg font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{event.name}</h3>
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${darkMode ? 'bg-slate-800 text-red-300' : 'bg-red-50 text-red-600'}`}>Encerrado</span>
+                      </div>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Prazo encerrado em <span className="font-semibold">{deadlineLabel}</span></p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={`p-6 rounded-xl border text-center text-sm ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-500'}`}>
+              Ainda não há eventos encerrados.
+            </div>
+          )}
+        </section>
       </div>
     );
   }
@@ -1227,6 +1404,16 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
            <div>
              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Evento Selecionado</label>
              <h2 className={`text-lg font-bold ${accentText}`}>{activeEvent?.name}</h2>
+             {activeEventDeadline && (
+               <p className={`text-xs mt-1 flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                 Prazo para respostas: <span className="font-semibold">{formatDate(activeEventDeadline)}</span>
+                 {activeEventClosed && (
+                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-300">
+                     <AlertTriangle size={12} /> Encerrado
+                   </span>
+                 )}
+               </p>
+             )}
            </div>
         </div>
         
@@ -1246,6 +1433,21 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
         </div>
       </div>
 
+      {activeEventClosed ? (
+        <div className={`p-6 rounded-xl border text-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>Prazo encerrado</h3>
+          <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'} text-sm mb-4`}>
+            Este evento não aceita mais avaliações. Volte para a lista e selecione um evento em andamento.
+          </p>
+          <button 
+            onClick={() => setActiveEventId(null)}
+            className={`${BUTTON_BASE_CLASS} ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-800 hover:bg-slate-900 text-white'} px-4 py-3`}
+          >
+            <ArrowLeft size={16} /> Ver outros eventos
+          </button>
+        </div>
+      ) : (
+      <>
       {/* 2. Group Selection */}
       {!selectedGroupId && activeEventId && (
         <div className="space-y-3">
@@ -1350,48 +1552,6 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
                         </p>
                     )}
                     
-                    {!activeInfo && (
-                       <p className="text-xs text-slate-400 line-clamp-2">{criterion.description}</p>
-                    )}
-                  </div>
-
-                  <div className="mt-auto">
-                    <div className="flex justify-between items-center mb-2">
-                         <span className="text-xs font-bold text-slate-400 uppercase">Nota</span>
-                      <span className={`text-xl font-bold ${scores[criterion.id] !== undefined ? (darkMode ? 'text-violet-300' : 'text-indigo-600') : (darkMode ? 'text-slate-700' : 'text-slate-300')}`}>
-                            {scores[criterion.id] ?? '-'}
-                         </span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="10" 
-                      step="0.5"
-                      className={`w-full h-3 rounded-lg appearance-none cursor-pointer ${darkMode ? 'accent-violet-400 bg-slate-800' : 'accent-indigo-600 bg-slate-100'}`}
-                      value={scores[criterion.id] ?? 0}
-                      onChange={(e) => setScores({...scores, [criterion.id]: parseFloat(e.target.value)})}
-                    />
-                     <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
-                        <span>0</span>
-                        <span>5</span>
-                        <span>10</span>
-                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Individual Evaluation */}
-          {selectedGroup.members.length > 0 && (
-             <div>
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide px-1 mb-3">Avaliação Individual</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {selectedGroup.members.map((member: Member) => (
-                    <div key={member.id} className={`p-4 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                      <div className="flex justify-between items-center mb-3">
-                         <div className="flex items-center gap-2 overflow-hidden">
-                           <div className={`p-1.5 rounded-full ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
                              {member.icon ? <DynamicIcon name={member.icon} size={16}/> : <User size={16}/>}
                            </div>
                            <span className={`font-semibold truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{member.name}</span>
@@ -1441,6 +1601,8 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
           </button>
         </div>
       )}
+      </>
+      )}
     </div>
   );
 };
@@ -1454,6 +1616,7 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
   // New Event Inputs
   const [newEventName, setNewEventName] = useState('');
   const [newEventDate, setNewEventDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newEventDeadline, setNewEventDeadline] = useState(new Date().toISOString().split('T')[0]);
   const [newEventIcon, setNewEventIcon] = useState('Calendar');
   
   // Inputs
@@ -1467,6 +1630,10 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [passwordFeedback, setPasswordFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  useEffect(() => {
+    setNewEventDeadline((prev) => (prev < newEventDate ? newEventDate : prev));
+  }, [newEventDate]);
+
   const currentEvent = events.find((e: Event) => e.id === activeEventId);
   const currentGroups = groups.filter((g: Group) => g.eventId === activeEventId);
   const currentCriteria = criteria.filter((c: Criterion) => c.eventId === activeEventId);
@@ -1476,6 +1643,20 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
   const updateEventIcon = (iconValue: string) => {
     if (!currentEvent) return;
     setEvents(events.map((evt: Event) => evt.id === currentEvent.id ? { ...evt, icon: iconValue } : evt));
+  };
+
+  const updateEventDate = (dateValue: string) => {
+    if (!currentEvent) return;
+    setEvents(events.map((evt: Event) => {
+      if (evt.id !== currentEvent.id) return evt;
+      const normalizedDeadline = evt.responseDeadline && evt.responseDeadline >= dateValue ? evt.responseDeadline : dateValue;
+      return { ...evt, date: dateValue, responseDeadline: normalizedDeadline };
+    }));
+  };
+
+  const updateEventDeadline = (deadlineValue: string) => {
+    if (!currentEvent) return;
+    setEvents(events.map((evt: Event) => evt.id === currentEvent.id ? { ...evt, responseDeadline: deadlineValue || evt.date } : evt));
   };
   
   const handleAddEvent = () => {
@@ -1487,6 +1668,7 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
       id: Date.now().toString(), 
       name: newEventName,
       date: newEventDate,
+      responseDeadline: newEventDeadline || newEventDate,
       icon: newEventIcon
     };
     const newEvtCriteria = generateDefaultCriteria(newEvent.id);
@@ -1495,6 +1677,7 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
     setCriteria([...criteria, ...newEvtCriteria]);
     setNewEventName('');
     setNewEventIcon('Calendar');
+    setNewEventDeadline(newEventDate);
     setActiveEventId(newEvent.id);
     setViewState('edit');
     showModal('success', 'Evento criado!', `O evento "${newEvent.name}" já aparece para avaliação. ${getFirebaseConfirmationText()}`);
@@ -1633,13 +1816,28 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
               onChange={(e) => setNewEventName(e.target.value)}
             />
             
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Data do Evento</label>
+                <input 
+                  type="date"
+                  className={`w-full p-3 border rounded-lg text-sm focus:outline-none focus:border-slate-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-600'}`}
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prazo para Respostas</label>
+                <input 
+                  type="date"
+                  className={`w-full p-3 border rounded-lg text-sm focus:outline-none focus:border-slate-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-600'}`}
+                  min={newEventDate}
+                  value={newEventDeadline}
+                  onChange={(e) => setNewEventDeadline(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="flex gap-2 items-center">
-              <input 
-                type="date"
-                className={`w-40 p-3 border rounded-lg text-sm focus:outline-none focus:border-slate-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-600'}`}
-                value={newEventDate}
-                onChange={(e) => setNewEventDate(e.target.value)}
-              />
               <button 
                 onClick={handleAddEvent} 
                 className={`${BUTTON_BASE_CLASS} flex-1 text-sm text-white py-3 px-4 shadow-sm active:scale-95 ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-800 hover:bg-slate-900'}`}
@@ -1672,10 +1870,13 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
                     {e.icon ? <DynamicIcon name={e.icon} size={24} /> : <Calendar size={24} />}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-700'}`}>{e.name}</span>
                        <span className={`text-xs px-2 py-0.5 rounded border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
                           {new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                       </span>
+                       <span className={`text-xs px-2 py-0.5 rounded border ${isEventClosed(e) ? 'border-red-200 text-red-600 bg-red-50' : 'border-emerald-200 text-emerald-600 bg-emerald-50'} ${darkMode ? 'border-transparent' : ''}`}>
+                          {isEventClosed(e) ? 'Prazo encerrado' : `Prazo: ${new Date(getEventDeadline(e) + 'T12:00:00').toLocaleDateString('pt-BR')}`}
                        </span>
                     </div>
                     <span className="block text-xs text-slate-400 font-normal mt-1">Toque para editar</span>
@@ -1801,6 +2002,34 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
               />
               <span className={`text-[11px] ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Recomendado: imagens quadradas até 256px.</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={`p-5 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-2">
+          <Calendar size={18} /> Agenda e Prazo
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-500 block mb-2">Data do Evento</label>
+            <input
+              type="date"
+              value={currentEvent.date}
+              onChange={(e) => updateEventDate(e.target.value)}
+              className={`w-full p-3 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300'}`}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-500 block mb-2">Prazo para Respostas</label>
+            <input
+              type="date"
+              value={getEventDeadline(currentEvent)}
+              min={currentEvent.date}
+              onChange={(e) => updateEventDeadline(e.target.value)}
+              className={`w-full p-3 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300'}`}
+            />
+            <p className={`text-xs mt-2 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>Após esse dia os avaliadores não poderão enviar novas notas, mas o evento aparecerá em “Eventos passados”.</p>
           </div>
         </div>
       </section>
