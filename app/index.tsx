@@ -411,9 +411,7 @@ const App = () => {
           }
         }
 
-        if (remotePassword) {
-          setStoredAdminPassword(remotePassword);
-        }
+        setStoredAdminPassword(remotePassword);
         setAdminPasswordLoaded(true);
       } catch (error) {
         console.warn('Falha ao carregar dados do Firestore', error);
@@ -1850,15 +1848,19 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
       showModal('error', 'Confirmação inválida', 'A confirmação precisa ser igual à nova senha.');
       return;
     }
-    setAdminPassword(newPasswordInput);
-    saveAdminPassword(newPasswordInput).catch((err) => {
-      console.warn('Falha ao salvar senha no Firestore', err);
-    });
-    setPasswordFeedback({ type: 'success', message: 'Senha atualizada com sucesso.' });
-    setCurrentPasswordInput('');
-    setNewPasswordInput('');
-    setConfirmPasswordInput('');
-    showModal('success', 'Senha atualizada!', 'Seu acesso de administrador foi atualizado e sincronizado com o servidor.');
+    saveAdminPassword(newPasswordInput)
+      .then(() => {
+        setAdminPassword(newPasswordInput);
+        setPasswordFeedback({ type: 'success', message: 'Senha salva no banco de dados.' });
+        setCurrentPasswordInput('');
+        setNewPasswordInput('');
+        setConfirmPasswordInput('');
+        showModal('success', 'Senha atualizada!', 'A nova senha foi salva no banco de dados Firestore.');
+      })
+      .catch((err) => {
+        console.warn('Falha ao salvar senha no Firestore', err);
+        showModal('error', 'Erro ao salvar', 'Não foi possível salvar a senha no banco de dados. Tente novamente.');
+      });
   };
 
   // --- Render ---
