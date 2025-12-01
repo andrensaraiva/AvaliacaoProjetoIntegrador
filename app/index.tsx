@@ -511,7 +511,7 @@ const App = () => {
 
   const { activeGroups, activeCriteria, activeEvaluations } = getActiveData();
 
-  const handlePersistEvaluation = (ev: Evaluation, isUpdate: boolean = false) => {
+  const handlePersistEvaluation = (ev: Evaluation, isUpdate = false) => {
     if (isUpdate) {
       setEvaluations((prev) => prev.map((e) => e.id === ev.id ? ev : e));
     } else {
@@ -1201,25 +1201,23 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
   const selectedGroup = groups.find((g: Group) => g.id === selectedGroupId);
   const activeEvent = events.find((e: Event) => e.id === activeEventId);
 
-  // Get existing evaluation for current evaluator and selected group
+  // Find existing evaluation for current evaluator+group combination
   const existingEvaluation = useMemo(() => {
-    if (!selectedGroupId || !evaluatorName || !activeEventId) return null;
-    return evaluations.find((e: Evaluation) => 
-      e.groupId === selectedGroupId && 
-      e.eventId === activeEventId && 
-      e.evaluatorName === evaluatorName
-    ) || null;
-  }, [selectedGroupId, evaluatorName, activeEventId, evaluations]);
+    if (!evaluatorName || !selectedGroupId || !activeEventId) return null;
+    return evaluations.find((ev: Evaluation) => 
+      ev.eventId === activeEventId && 
+      ev.groupId === selectedGroupId && 
+      ev.evaluatorName.toLowerCase().trim() === evaluatorName.toLowerCase().trim()
+    );
+  }, [evaluations, evaluatorName, selectedGroupId, activeEventId]);
 
-  // Load existing evaluation data when selecting a group that was already evaluated
+  // Load existing evaluation data when found
   useEffect(() => {
-    if (existingEvaluation) {
+    if (existingEvaluation && !editingEvaluationId) {
       setScores(existingEvaluation.scores || {});
       setIndivScores(existingEvaluation.individualScores || {});
       setGroupComment(existingEvaluation.groupComment || '');
       setEditingEvaluationId(existingEvaluation.id);
-    } else {
-      setEditingEvaluationId(null);
     }
   }, [existingEvaluation]);
 
@@ -1258,7 +1256,6 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
       setScores({});
       setIndivScores({});
       setGroupComment('');
-      setEditingEvaluationId(null);
       return;
     }
 
@@ -1285,9 +1282,8 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     setGroupComment('');
     setEditingEvaluationId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast('success', isUpdate ? 'Avaliação atualizada!' : 'Avaliação salva com sucesso.');
+    showToast('success', isUpdate ? 'Avaliação atualizada!' : 'Sucesso! Avaliação salva.');
     showModal('success', isUpdate ? 'Avaliação atualizada!' : 'Avaliação registrada!', `As notas foram salvas e estarão disponíveis para o administrador revisar. ${getFirebaseConfirmationText()}`);
-  };
   };
 
   const sortedEvents = useMemo(() => {
@@ -1557,7 +1553,6 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
             <ArrowLeft size={20} /> Voltar para Grupos
           </button>
 
-          {/* Editing indicator */}
           {editingEvaluationId && (
             <div className={`p-3 rounded-lg flex items-center gap-2 ${darkMode ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
               <PenTool size={16} />
@@ -1645,13 +1640,18 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
 
           <button 
             onClick={handleSubmit}
-            className={`${BUTTON_BASE_CLASS} w-full ${editingEvaluationId ? (darkMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-amber-500 hover:bg-amber-600') : accentButton} text-white py-4 text-lg shadow-lg active:scale-[0.98]`}
+            className={`${BUTTON_BASE_CLASS} w-full ${editingEvaluationId ? 'bg-amber-600 hover:bg-amber-700' : accentButton} text-white py-4 text-lg shadow-lg active:scale-[0.98]`}
           >
-            {editingEvaluationId ? <><PenTool /> Atualizar Avaliação</> : <><Save /> Confirmar Avaliação</>}
+            {editingEvaluationId ? (
+              <><PenTool /> Atualizar Avaliação</>
+            ) : (
+              <><Save /> Confirmar Avaliação</>
+            )}
           </button>
         </div>
       )}
       </>
+      )}
     </div>
   );
 };
