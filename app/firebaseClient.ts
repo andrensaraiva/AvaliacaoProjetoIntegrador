@@ -56,12 +56,24 @@ export const syncStructureSnapshot = async (payload: { events: unknown; groups: 
   });
 };
 
+// Helper to remove undefined values (Firestore doesn't accept undefined)
+const removeUndefinedFields = (obj: Record<string, any>): Record<string, any> => {
+  const cleaned: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    if (obj[key] !== undefined) {
+      cleaned[key] = obj[key];
+    }
+  }
+  return cleaned;
+};
+
 export const syncEvaluationToFirebase = async (evaluation: any) => {
   const db = getFirestoreDb();
   if (!db) return;
   const evaluationRef = doc(db, 'evaluations', `${evaluation.eventId}_${evaluation.groupId}_${evaluation.id}`);
+  const cleanedEvaluation = removeUndefinedFields(evaluation);
   await setDoc(evaluationRef, {
-    ...evaluation,
+    ...cleanedEvaluation,
     syncedAt: Date.now(),
   });
 };
