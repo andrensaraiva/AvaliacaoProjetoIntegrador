@@ -1652,7 +1652,6 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
         </div>
       )}
       </>
-      )}
     </div>
   );
 };
