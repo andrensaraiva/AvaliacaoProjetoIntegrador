@@ -140,7 +140,7 @@ const BUTTON_BASE_CLASS = 'inline-flex items-center justify-center gap-2 rounded
 
 const getFirebaseConfirmationText = () => {
   return isFirebaseConfigured
-    ? 'Os dados foram sincronizados com o Firebase Realtime Database.'
+    ? 'Os dados foram sincronizados com o Firebase Firestore.'
     : 'Configure o Firebase para que estes dados também sejam sincronizados online.';
 };
 
@@ -411,7 +411,8 @@ const App = () => {
           }
         }
       } catch (error) {
-        console.warn('Falha ao carregar dados do Firebase', error);
+        console.warn('Falha ao carregar dados do Firestore', error);
+        showToast('error', 'Não foi possível carregar os dados do servidor. Usando dados locais.');
       } finally {
         if (isMounted) {
           setStructureSyncReady(true);
@@ -472,9 +473,9 @@ const App = () => {
         structureSyncError.current = false;
       })
       .catch((err) => {
-        console.warn('Falha ao sincronizar estrutura no Firebase', err);
+        console.warn('Falha ao sincronizar estrutura no Firestore', err);
         if (!structureSyncError.current) {
-          showModal('error', 'Falha ao sincronizar', 'Ops! Não foi possível atualizar os dados no Firebase. Tente novamente em instantes.');
+          showModal('error', 'Erro ao salvar no banco de dados', 'Não foi possível salvar as alterações no servidor. Verifique sua conexão com a internet e tente novamente. Os dados continuam salvos localmente.');
           structureSyncError.current = true;
         }
       });
@@ -513,8 +514,8 @@ const App = () => {
   const handlePersistEvaluation = (ev: Evaluation) => {
     setEvaluations((prev) => [...prev, ev]);
     syncEvaluationToFirebase(ev).catch((err) => {
-      console.warn('Falha ao enviar avaliação para o Firebase', err);
-      showModal('error', 'Erro ao sincronizar', 'Ops! Não foi possível sincronizar sua avaliação com o Firebase. Ela continuará salva localmente.');
+      console.warn('Falha ao enviar avaliação para o Firestore', err);
+      showModal('error', 'Erro ao salvar avaliação', 'Não foi possível enviar sua avaliação para o servidor. Verifique sua conexão com a internet. A avaliação foi salva localmente e será sincronizada quando a conexão for restabelecida.');
     });
   };
 
