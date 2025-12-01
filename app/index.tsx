@@ -511,8 +511,12 @@ const App = () => {
 
   const { activeGroups, activeCriteria, activeEvaluations } = getActiveData();
 
-  const handlePersistEvaluation = (ev: Evaluation) => {
-    setEvaluations((prev) => [...prev, ev]);
+  const handlePersistEvaluation = (ev: Evaluation, isUpdate: boolean = false) => {
+    if (isUpdate) {
+      setEvaluations((prev) => prev.map((e) => e.id === ev.id ? ev : e));
+    } else {
+      setEvaluations((prev) => [...prev, ev]);
+    }
     syncEvaluationToFirebase(ev).catch((err) => {
       console.warn('Falha ao enviar avaliação para o Firestore', err);
       showModal('error', 'Erro ao salvar avaliação', 'Não foi possível enviar sua avaliação para o servidor. Verifique sua conexão com a internet. A avaliação foi salva localmente e será sincronizada quando a conexão for restabelecida.');
@@ -1192,9 +1196,32 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
   const [indivScores, setIndivScores] = useState<Record<string, number>>({});
   const [groupComment, setGroupComment] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
+  const [editingEvaluationId, setEditingEvaluationId] = useState<string | null>(null);
 
   const selectedGroup = groups.find((g: Group) => g.id === selectedGroupId);
   const activeEvent = events.find((e: Event) => e.id === activeEventId);
+
+  // Get existing evaluation for current evaluator and selected group
+  const existingEvaluation = useMemo(() => {
+    if (!selectedGroupId || !evaluatorName || !activeEventId) return null;
+    return evaluations.find((e: Evaluation) => 
+      e.groupId === selectedGroupId && 
+      e.eventId === activeEventId && 
+      e.evaluatorName === evaluatorName
+    ) || null;
+  }, [selectedGroupId, evaluatorName, activeEventId, evaluations]);
+
+  // Load existing evaluation data when selecting a group that was already evaluated
+  useEffect(() => {
+    if (existingEvaluation) {
+      setScores(existingEvaluation.scores || {});
+      setIndivScores(existingEvaluation.individualScores || {});
+      setGroupComment(existingEvaluation.groupComment || '');
+      setEditingEvaluationId(existingEvaluation.id);
+    } else {
+      setEditingEvaluationId(null);
+    }
+  }, [existingEvaluation]);
 
   useEffect(() => {
     const savedName = localStorage.getItem('last_evaluator_name');
@@ -1211,6 +1238,7 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     setScores({});
     setIndivScores({});
     setGroupComment('');
+    setEditingEvaluationId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1230,13 +1258,15 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
       setScores({});
       setIndivScores({});
       setGroupComment('');
+      setEditingEvaluationId(null);
       return;
     }
 
     const normalizedComment = groupComment.trim();
+    const isUpdate = !!editingEvaluationId;
 
     const evaluation: Evaluation = {
-      id: Date.now().toString(),
+      id: isUpdate ? editingEvaluationId : Date.now().toString(),
       eventId: activeEventId,
       groupId: selectedGroupId,
       evaluatorName,
@@ -1247,15 +1277,17 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
     };
     
     localStorage.setItem('last_evaluator_name', evaluatorName);
-    onSave(evaluation);
+    onSave(evaluation, isUpdate);
     
     setSelectedGroupId('');
     setScores({});
     setIndivScores({});
     setGroupComment('');
+    setEditingEvaluationId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast('success', 'Sucesso! Avaliação salva com sucesso.');
-    showModal('success', 'Avaliação registrada!', `As notas foram salvas e estarão disponíveis para o administrador revisar. ${getFirebaseConfirmationText()}`);
+    showToast('success', isUpdate ? 'Avaliação atualizada!' : 'Avaliação salva com sucesso.');
+    showModal('success', isUpdate ? 'Avaliação atualizada!' : 'Avaliação registrada!', `As notas foram salvas e estarão disponíveis para o administrador revisar. ${getFirebaseConfirmationText()}`);
+  };
   };
 
   const sortedEvents = useMemo(() => {
@@ -1516,18 +1548,29 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
             onClick={() => {
               setSelectedGroupId('');
               setGroupComment('');
+              setScores({});
+              setIndivScores({});
+              setEditingEvaluationId(null);
             }}
             className={`flex items-center gap-2 font-medium transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-800'}`}
           >
             <ArrowLeft size={20} /> Voltar para Grupos
           </button>
 
+          {/* Editing indicator */}
+          {editingEvaluationId && (
+            <div className={`p-3 rounded-lg flex items-center gap-2 ${darkMode ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+              <PenTool size={16} />
+              <span className="text-sm font-medium">Você está editando uma avaliação existente</span>
+            </div>
+          )}
+
           <div className="text-center mb-6">
              <div className="inline-block p-2 rounded-full bg-slate-100 dark:bg-slate-800 mb-3">
                {selectedGroup.icon ? <DynamicIcon name={selectedGroup.icon} size={64} /> : <Users size={64} className="text-indigo-600" />}
              </div>
             <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{selectedGroup.name}</h2>
-            <p className={`${accentText}`}>Avaliação do Grupo</p>
+            <p className={`${accentText}`}>{editingEvaluationId ? 'Editar Avaliação' : 'Avaliação do Grupo'}</p>
           </div>
 
           {/* Criteria */}
@@ -1602,9 +1645,9 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
 
           <button 
             onClick={handleSubmit}
-            className={`${BUTTON_BASE_CLASS} w-full ${accentButton} text-white py-4 text-lg shadow-lg active:scale-[0.98]`}
+            className={`${BUTTON_BASE_CLASS} w-full ${editingEvaluationId ? (darkMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-amber-500 hover:bg-amber-600') : accentButton} text-white py-4 text-lg shadow-lg active:scale-[0.98]`}
           >
-            <Save /> Confirmar Avaliação
+            {editingEvaluationId ? <><PenTool /> Atualizar Avaliação</> : <><Save /> Confirmar Avaliação</>}
           </button>
         </div>
       )}
