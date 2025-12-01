@@ -105,3 +105,19 @@ export const fetchEvaluationsSnapshot = async () => {
   });
   return tree;
 };
+
+export const fetchAdminPassword = async (): Promise<string | null> => {
+  const db = getFirestoreDb();
+  if (!db) return null;
+  const settingsRef = doc(db, 'app', 'settings');
+  const snapshot = await getDoc(settingsRef);
+  if (!snapshot.exists()) return null;
+  return snapshot.data()?.adminPassword || null;
+};
+
+export const saveAdminPassword = async (password: string): Promise<void> => {
+  const db = getFirestoreDb();
+  if (!db) return;
+  const settingsRef = doc(db, 'app', 'settings');
+  await setDoc(settingsRef, { adminPassword: password, updatedAt: Date.now() }, { merge: true });
+};

@@ -48,7 +48,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
-import { syncEvaluationToFirebase, syncStructureSnapshot, isFirebaseConfigured, fetchStructureSnapshot, fetchEvaluationsSnapshot } from './firebaseClient';
+import { syncEvaluationToFirebase, syncStructureSnapshot, isFirebaseConfigured, fetchStructureSnapshot, fetchEvaluationsSnapshot, fetchAdminPassword, saveAdminPassword } from './firebaseClient';
 
 // --- Types ---
 
@@ -358,9 +358,8 @@ const App = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [storedAdminPassword, setStoredAdminPassword] = useState(() => {
-    return localStorage.getItem('api_admin_password') || 'admin';
-  });
+  const [storedAdminPassword, setStoredAdminPassword] = useState('admin');
+  const [adminPasswordLoaded, setAdminPasswordLoaded] = useState(false);
 
   const [toast, setToast] = useState<ToastMessage>(null);
   const [modal, setModal] = useState<ModalMessage>(null);
@@ -380,9 +379,10 @@ const App = () => {
 
     const bootstrapFromFirebase = async () => {
       try {
-        const [structureSnapshot, evaluationsSnapshot] = await Promise.all([
+        const [structureSnapshot, evaluationsSnapshot, remotePassword] = await Promise.all([
           fetchStructureSnapshot(),
           fetchEvaluationsSnapshot(),
+          fetchAdminPassword(),
         ]);
 
         if (!isMounted) return;
@@ -410,9 +410,15 @@ const App = () => {
             });
           }
         }
+
+        if (remotePassword) {
+          setStoredAdminPassword(remotePassword);
+        }
+        setAdminPasswordLoaded(true);
       } catch (error) {
         console.warn('Falha ao carregar dados do Firestore', error);
         showToast('error', 'Não foi possível carregar os dados do servidor. Usando dados locais.');
+        setAdminPasswordLoaded(true);
       } finally {
         if (isMounted) {
           setStructureSyncReady(true);
@@ -426,11 +432,17 @@ const App = () => {
     };
   }, [structureSyncReady, isFirebaseConfigured]);
 
+  // Load admin password on mount if Firebase not configured
+  useEffect(() => {
+    if (!isFirebaseConfigured) {
+      setAdminPasswordLoaded(true);
+    }
+  }, []);
+
   useEffect(() => { localStorage.setItem('v5_api_events', JSON.stringify(events)); }, [events]);
   useEffect(() => { localStorage.setItem('v5_api_groups', JSON.stringify(groups)); }, [groups]);
   useEffect(() => { localStorage.setItem('v5_api_criteria', JSON.stringify(criteria)); }, [criteria]);
   useEffect(() => { localStorage.setItem('v5_api_evaluations', JSON.stringify(evaluations)); }, [evaluations]);
-  useEffect(() => { localStorage.setItem('api_admin_password', storedAdminPassword); }, [storedAdminPassword]);
   
   useEffect(() => {
     if (darkMode) {
@@ -1839,11 +1851,14 @@ const ConfigView = ({ events, setEvents, groups, setGroups, criteria, setCriteri
       return;
     }
     setAdminPassword(newPasswordInput);
+    saveAdminPassword(newPasswordInput).catch((err) => {
+      console.warn('Falha ao salvar senha no Firestore', err);
+    });
     setPasswordFeedback({ type: 'success', message: 'Senha atualizada com sucesso.' });
     setCurrentPasswordInput('');
     setNewPasswordInput('');
     setConfirmPasswordInput('');
-    showModal('success', 'Senha atualizada!', 'Seu acesso de administrador foi atualizado. Essas informações ficam salvas localmente.');
+    showModal('success', 'Senha atualizada!', 'Seu acesso de administrador foi atualizado e sincronizado com o servidor.');
   };
 
   // --- Render ---
