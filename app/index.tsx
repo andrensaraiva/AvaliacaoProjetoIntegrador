@@ -45,7 +45,14 @@ import {
   Heart,
   Upload,
   Image as ImageIcon,
-  AlertTriangle
+  AlertTriangle,
+  HelpCircle,
+  ChevronRight,
+  Trophy,
+  TrendingUp,
+  MessageCircle,
+  Eye,
+  X
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { syncEvaluationToFirebase, syncStructureSnapshot, isFirebaseConfigured, fetchStructureSnapshot, fetchEvaluationsSnapshot, fetchAdminPassword, saveAdminPassword } from './firebaseClient';
@@ -109,7 +116,7 @@ type FeedbackVariant = {
 // --- Icon Mapping ---
 
 const ICON_MAP: Record<string, any> = {
-  Rocket, Zap, Lightbulb, Globe, Code, Cpu, Beaker, Book, Briefcase, Target, Star, Smile, Gamepad, Music, Heart, Calendar, Users, User, Award, ImageIcon
+  Rocket, Zap, Lightbulb, Globe, Code, Cpu, Beaker, Book, Briefcase, Target, Star, Smile, Gamepad, Music, Heart, Calendar, Users, User, Award, ImageIcon, Trophy, TrendingUp, HelpCircle, MessageCircle, Eye
 };
 
 const AVAILABLE_ICONS = ['Rocket', 'Zap', 'Lightbulb', 'Globe', 'Code', 'Cpu', 'Beaker', 'Target', 'Star', 'Book', 'Briefcase', 'Gamepad', 'Music', 'Heart'];
@@ -265,6 +272,242 @@ const ImageUploadButton = ({ onImageSelected, className = '', darkMode, label = 
 
 // --- Default Data Helpers ---
 
+// --- Onboarding Guide Component ---
+const ONBOARDING_STEPS = [
+  {
+    icon: Award,
+    title: 'Bem-vindo ao Avaliador!',
+    description: 'Esta ferramenta permite que você avalie projetos integradores de forma simples e organizada. Vamos te mostrar como funciona em poucos passos.',
+    tip: 'Você pode revisitar este guia a qualquer momento clicando no botão de ajuda (?) no canto inferior direito.',
+  },
+  {
+    icon: Calendar,
+    title: '1. Escolha o Evento',
+    description: 'Na primeira tela, selecione o evento em andamento para o qual deseja registrar suas avaliações. Eventos com prazo encerrado ficam bloqueados.',
+    tip: 'Eventos ativos aparecem com borda verde. Eventos encerrados ficam em vermelho.',
+  },
+  {
+    icon: Users,
+    title: '2. Selecione o Grupo',
+    description: 'Depois de escolher o evento, você verá os grupos participantes. Toque em um grupo para iniciar a avaliação. Grupos já avaliados por você aparecerão com um selo "Avaliado".',
+    tip: 'Você pode reavaliar um grupo — a nota anterior será substituída automaticamente.',
+  },
+  {
+    icon: Target,
+    title: '3. Dê suas Notas',
+    description: 'Arraste o slider para dar nota de 0 a 10 para cada critério. A cor muda conforme a nota: vermelho (baixa), amarelo (média), verde (boa) e azul (excelente).',
+    tip: 'Notas de 0.5 em 0.5 são aceitas. Você também pode avaliar cada integrante individualmente.',
+  },
+  {
+    icon: MessageCircle,
+    title: '4. Deixe um Comentário',
+    description: 'Ao final da avaliação, há um campo opcional para deixar observações qualitativas sobre o grupo. Esses comentários ficam visíveis para o administrador.',
+    tip: 'Comentários ajudam o administrador a entender o contexto por trás das notas.',
+  },
+  {
+    icon: CheckCircle,
+    title: 'Tudo Pronto!',
+    description: 'Clique em "Confirmar Avaliação" para salvar. Suas notas serão armazenadas localmente e, se configurado, sincronizadas com o servidor.',
+    tip: 'Informe seu nome antes de avaliar — ele será lembrado para as próximas vezes.',
+  },
+];
+
+const OnboardingGuide = ({ darkMode, onClose }: { darkMode: boolean; onClose: () => void }) => {
+  const [step, setStep] = useState(0);
+  const currentStep = ONBOARDING_STEPS[step];
+  const isLast = step === ONBOARDING_STEPS.length - 1;
+  const isFirst = step === 0;
+
+  return (
+    <div className="onboarding-overlay">
+      <div className="onboarding-backdrop" onClick={onClose} />
+      <div className={`onboarding-card p-6 shadow-2xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+        {/* Close Button */}
+        <button 
+          onClick={onClose}
+          className={`absolute top-4 right-4 p-1.5 rounded-full transition-colors ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100'}`}
+        >
+          <X size={18} />
+        </button>
+
+        {/* Icon */}
+        <div className="text-center mb-5">
+          <div className={`inline-flex p-4 rounded-2xl mb-4 animate-float ${darkMode ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-100 text-indigo-600'}`}>
+            {React.createElement(currentStep.icon, { size: 40 })}
+          </div>
+          <h3 className="text-xl font-bold mb-2">{currentStep.title}</h3>
+          <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+            {currentStep.description}
+          </p>
+        </div>
+
+        {/* Tip Box */}
+        <div className={`p-3 rounded-xl flex items-start gap-2 mb-6 ${darkMode ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-100'}`}>
+          <Lightbulb size={16} className={`shrink-0 mt-0.5 ${darkMode ? 'text-amber-300' : 'text-amber-600'}`} />
+          <p className={`text-xs ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{currentStep.tip}</p>
+        </div>
+
+        {/* Step Indicators */}
+        <div className="onboarding-step-indicator mb-5">
+          {ONBOARDING_STEPS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setStep(i)}
+              className={`onboarding-dot transition-all ${
+                i === step 
+                  ? `onboarding-dot-active ${darkMode ? 'bg-indigo-400' : 'bg-indigo-600'}` 
+                  : i < step 
+                    ? (darkMode ? 'bg-indigo-600' : 'bg-indigo-300')
+                    : (darkMode ? 'bg-slate-700' : 'bg-slate-200')
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Navigation */}
+        <div className="flex gap-3">
+          {!isFirst && (
+            <button
+              onClick={() => setStep(step - 1)}
+              className={`flex-1 py-3 rounded-xl font-semibold text-sm transition-colors ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            >
+              Anterior
+            </button>
+          )}
+          <button
+            onClick={() => isLast ? onClose() : setStep(step + 1)}
+            className={`flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-colors flex items-center justify-center gap-2 ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+          >
+            {isLast ? (
+              <><CheckCircle size={16} /> Começar a Avaliar</>
+            ) : (
+              <>Próximo <ChevronRight size={16} /></>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Help FAB Component ---
+const HelpFAB = ({ darkMode, onClick }: { darkMode: boolean; onClick: () => void }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`help-fab ${darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'}`}
+      title="Guia de Ajuda"
+    >
+      <HelpCircle size={24} />
+    </button>
+  );
+};
+
+// --- Enhanced Score Display Component ---
+const ScoreGauge = ({ score, maxScore = 10, size = 72, darkMode }: { score: number; maxScore?: number; size?: number; darkMode: boolean }) => {
+  const radius = (size - 8) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.min(score / maxScore, 1);
+  const offset = circumference * (1 - pct);
+  
+  const getColor = (pct: number) => {
+    if (pct >= 0.8) return '#6366f1'; // indigo - excellent
+    if (pct >= 0.6) return '#10b981'; // emerald - good
+    if (pct >= 0.4) return '#f59e0b'; // amber - medium
+    return '#ef4444'; // red - low
+  };
+  
+  const color = getColor(pct);
+  
+  return (
+    <div className="score-gauge animate-score-pop" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          cx={size/2}
+          cy={size/2}
+          r={radius}
+          fill="none"
+          stroke={darkMode ? '#1e293b' : '#e2e8f0'}
+          strokeWidth={6}
+        />
+        <circle
+          cx={size/2}
+          cy={size/2}
+          r={radius}
+          className="score-gauge-circle"
+          stroke={color}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+          {score.toFixed(1)}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// --- Enhanced Progress Bar ---
+const AnimatedBar = ({ value, maxValue = 10, label, darkMode, rank }: { value: number; maxValue?: number; label: string; darkMode: boolean; rank?: number }) => {
+  const pct = Math.min((value / maxValue) * 100, 100);
+  
+  const getBarClass = () => {
+    if (rank === 0) return 'progress-bar-gold';
+    if (rank === 1) return 'progress-bar-silver';
+    if (rank === 2) return 'progress-bar-bronze';
+    return 'progress-bar-gradient';
+  };
+
+  const getScoreColor = (val: number) => {
+    if (val >= 8) return darkMode ? 'text-indigo-300' : 'text-indigo-600';
+    if (val >= 6) return darkMode ? 'text-emerald-300' : 'text-emerald-600';
+    if (val >= 4) return darkMode ? 'text-amber-300' : 'text-amber-600';
+    return darkMode ? 'text-red-300' : 'text-red-500';
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm gap-1.5 sm:gap-0">
+      <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{label}</span>
+      <div className="flex items-center gap-3 w-full sm:w-3/5">
+        <div className={`chart-bar-container flex-1 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+          <div 
+            className={`chart-bar-fill animate-bar-fill ${getBarClass()}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className={`font-mono font-bold w-10 text-right text-base ${getScoreColor(value)}`}>
+          {value.toFixed(1)}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// --- Score Color Helper ---
+const getScoreColorClass = (score: number, darkMode: boolean): string => {
+  if (score >= 8) return darkMode ? 'text-indigo-300' : 'text-indigo-600';
+  if (score >= 6) return darkMode ? 'text-emerald-300' : 'text-emerald-600';
+  if (score >= 4) return darkMode ? 'text-amber-300' : 'text-amber-600';
+  return darkMode ? 'text-red-300' : 'text-red-500';
+};
+
+const getScoreBgClass = (score: number, darkMode: boolean): string => {
+  if (score >= 8) return darkMode ? 'bg-indigo-500/10 border-indigo-500/30' : 'bg-indigo-50 border-indigo-200';
+  if (score >= 6) return darkMode ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200';
+  if (score >= 4) return darkMode ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200';
+  return darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200';
+};
+
+const getScoreLabel = (score: number): string => {
+  if (score >= 9) return 'Excelente';
+  if (score >= 7) return 'Muito Bom';
+  if (score >= 5) return 'Bom';
+  if (score >= 3) return 'Regular';
+  return 'Precisa Melhorar';
+};
+
 const generateDefaultCriteria = (eventId: string): Criterion[] => [
   { 
     id: `c1_${Date.now()}`, 
@@ -363,6 +606,8 @@ const App = () => {
 
   const [toast, setToast] = useState<ToastMessage>(null);
   const [modal, setModal] = useState<ModalMessage>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
 
   // Admin View State
   const [adminView, setAdminView] = useState<AdminView>('dashboard');
@@ -620,8 +865,16 @@ const App = () => {
 
          <div className="grid gap-4 w-full max-w-md">
             <button 
-              onClick={() => setRole('evaluator')}
-              className={`flex items-center gap-4 p-6 rounded-xl shadow-md border-2 border-transparent transition-all group ${
+              onClick={() => {
+                setRole('evaluator');
+                // Show onboarding for first-time evaluators
+                const hasSeenGuide = localStorage.getItem('onboarding_seen');
+                if (!hasSeenGuide) {
+                  setShowOnboarding(true);
+                  localStorage.setItem('onboarding_seen', 'true');
+                }
+              }}
+              className={`flex items-center gap-4 p-6 rounded-xl shadow-md border-2 border-transparent transition-all group card-hover-lift ${
                 darkMode ? 'bg-slate-900 hover:border-indigo-500' : 'bg-white hover:border-indigo-500'
               }`}
             >
@@ -636,7 +889,7 @@ const App = () => {
 
             <button 
               onClick={() => setShowAdminLogin(true)}
-              className={`flex items-center gap-4 p-6 rounded-xl shadow-md border-2 border-transparent transition-all group ${
+              className={`flex items-center gap-4 p-6 rounded-xl shadow-md border-2 border-transparent transition-all group card-hover-lift ${
                 darkMode ? 'bg-slate-900 hover:border-slate-500' : 'bg-white hover:border-slate-500'
               }`}
             >
@@ -800,7 +1053,7 @@ const App = () => {
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModal(null)}></div>
-          <div className={`relative w-full max-w-md rounded-3xl shadow-2xl border px-6 py-7 text-center space-y-4 ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+          <div className={`relative w-full max-w-md rounded-3xl shadow-2xl border px-6 py-7 text-center space-y-4 animate-scale-in ${darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
             <div className={`mx-auto w-16 h-16 rounded-2xl flex items-center justify-center ${FEEDBACK_VARIANTS[modal.type].modalIconClass}`}>
               {React.createElement(FEEDBACK_VARIANTS[modal.type].icon, { size: 32 })}
             </div>
@@ -816,6 +1069,21 @@ const App = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Onboarding Guide */}
+      {showOnboarding && (
+        <OnboardingGuide darkMode={darkMode} onClose={() => setShowOnboarding(false)} />
+      )}
+
+      {/* Help Guide (can be triggered anytime) */}
+      {showHelpGuide && (
+        <OnboardingGuide darkMode={darkMode} onClose={() => setShowHelpGuide(false)} />
+      )}
+
+      {/* Help FAB for evaluators */}
+      {role === 'evaluator' && !showOnboarding && !showHelpGuide && (
+        <HelpFAB darkMode={darkMode} onClick={() => setShowHelpGuide(true)} />
       )}
     </div>
   );
@@ -1032,10 +1300,34 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
         </div>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wide">Classificação dos Grupos</h2>
+          {/* Quick Stats Bar */}
+          <div className={`grid grid-cols-3 gap-3 mb-2`}>
+            <div className={`p-3 rounded-xl border text-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Grupos</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{groups.length}</p>
+            </div>
+            <div className={`p-3 rounded-xl border text-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Avaliações</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{evaluations.length}</p>
+            </div>
+            <div className={`p-3 rounded-xl border text-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wide">Média Geral</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                {evaluations.length > 0 
+                  ? (sortedGroups.reduce((acc: number, g: Group) => acc + parseFloat(calculateGroupScore(g.id)), 0) / sortedGroups.length).toFixed(1)
+                  : '-'
+                }
+              </p>
+            </div>
+          </div>
+
+          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+            <Trophy size={16} /> Classificação dos Grupos
+          </h2>
           
           {sortedGroups.map((group: Group, index: number) => {
             const score = calculateGroupScore(group.id);
+            const scoreNum = parseFloat(score);
             const isExpanded = expandedGroup === group.id;
             const groupEvals = evaluations.filter((e: Evaluation) => e.groupId === group.id);
             const groupComments = groupEvals
@@ -1047,10 +1339,24 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
                 timestamp: e.timestamp
               }));
             
+            const getPodiumClass = () => {
+              if (index === 0) return darkMode ? 'podium-gold-dark' : 'podium-gold';
+              if (index === 1) return darkMode ? 'podium-silver-dark' : 'podium-silver';
+              if (index === 2) return darkMode ? 'podium-bronze-dark' : 'podium-bronze';
+              return '';
+            };
+
+            const getMedalEmoji = () => {
+              if (index === 0) return '🥇';
+              if (index === 1) return '🥈';
+              if (index === 2) return '🥉';
+              return null;
+            };
+            
             return (
-              <div key={group.id} className={`rounded-xl shadow-sm border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+              <div key={group.id} className={`rounded-xl shadow-sm border overflow-hidden animate-fade-in-up card-hover-lift ${index < 3 ? getPodiumClass() : ''} ${!(index < 3) ? (darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200') : ''}`} style={{ animationDelay: `${index * 60}ms` }}>
                 <div 
-                  className={`p-4 flex justify-between items-center cursor-pointer transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}
+                  className={`p-4 flex justify-between items-center cursor-pointer transition-colors ${darkMode ? 'hover:bg-white/5' : 'hover:bg-black/[0.02]'}`}
                   onClick={() => {
                     setExpandedGroup(isExpanded ? null : group.id);
                     setAiFeedback(null);
@@ -1058,13 +1364,13 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
                 >
                   <div className="flex items-center gap-3">
                     <div className={`
-                      w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0
-                      ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 
-                        index === 1 ? 'bg-slate-200 text-slate-700' : 
-                        index === 2 ? 'bg-orange-100 text-orange-800' : 
+                      w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 transition-all
+                      ${index === 0 ? 'bg-yellow-400 text-yellow-900 shadow-md medal-glow-gold' : 
+                        index === 1 ? 'bg-slate-300 text-slate-700 shadow-md medal-glow-silver' : 
+                        index === 2 ? 'bg-orange-400 text-orange-900 shadow-md medal-glow-bronze' : 
                         (darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500')}
                     `}>
-                      #{index + 1}
+                      {getMedalEmoji() || `#${index + 1}`}
                     </div>
                     <div>
                       <h3 className={`font-semibold leading-tight flex items-center gap-2 ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
@@ -1075,42 +1381,51 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
                            </div>
                         )}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">{groupEvals.length} avaliações</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-slate-500">{groupEvals.length} avaliações</p>
+                        {groupEvals.length > 0 && (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${getScoreBgClass(scoreNum, darkMode)}`}>
+                            {getScoreLabel(scoreNum)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{score}</span>
+                    {groupEvals.length > 0 ? (
+                      <ScoreGauge score={scoreNum} darkMode={darkMode} size={64} />
+                    ) : (
+                      <span className={`text-xl font-bold ${darkMode ? 'text-slate-600' : 'text-slate-300'}`}>-</span>
+                    )}
                     {isExpanded ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className={`px-4 pb-4 pt-0 border-t ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`px-4 pb-4 pt-0 border-t animate-fade-in ${darkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50/80 border-slate-100'}`}>
                     
                     {/* Project Scores */}
                     <div className="mt-4 space-y-3">
-                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Notas do Projeto</h4>
+                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                        <BarChart3 size={14} /> Notas do Projeto por Critério
+                      </h4>
                       {criteria.map((c: Criterion) => {
                         const scores = groupEvals.map((e: Evaluation) => e.scores[c.id] || 0);
                         const avg = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0;
                         return (
-                          <div key={c.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm gap-1 sm:gap-0">
-                            <span className={`${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{c.name}</span>
-                            <div className="flex items-center gap-2 w-full sm:w-1/2">
-                              <div className={`h-2 rounded-full flex-1 overflow-hidden ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}>
-                                <div className="h-full bg-slate-600 rounded-full" style={{ width: `${avg * 10}%` }}></div>
-                              </div>
-                              <span className={`font-mono font-medium w-8 text-right ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{avg.toFixed(1)}</span>
-                            </div>
-                          </div>
+                          <AnimatedBar key={c.id} value={avg} label={c.name} darkMode={darkMode} />
                         );
+                      })}
                       })}
                     </div>
 
                     {/* Individual Scores */}
                     {group.members.length > 0 && (
                       <div className="mt-6 space-y-3">
-                         <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Notas Individuais (Média)</h4>
+                         <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                           <Users size={14} /> Notas Individuais (Média)
+                         </h4>
+                         <div className="grid gap-2">
                          {group.members.map((member: Member) => {
                            const memberScores = groupEvals
                              .map((e: Evaluation) => e.individualScores?.[member.id])
@@ -1121,23 +1436,35 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
                              : 0;
 
                            return (
-                             <div key={member.id} className={`flex justify-between items-center text-sm p-2 rounded-lg ${darkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                             <div key={member.id} className={`flex justify-between items-center text-sm p-3 rounded-xl border transition-all ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                                <div className={`flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                 {member.icon ? <DynamicIcon name={member.icon} size={14} className="text-slate-400" /> : <User size={14} className="text-slate-400"/>}
-                                 <span>{member.name}</span>
+                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                   {member.icon ? <DynamicIcon name={member.icon} size={16} className="text-slate-400" /> : <User size={16} className="text-slate-400"/>}
+                                 </div>
+                                 <span className="font-medium">{member.name}</span>
                                </div>
-                               <span className={`font-bold ${avg > 0 ? (darkMode ? 'text-slate-200' : 'text-slate-700') : 'text-slate-400'}`}>
-                                 {avg > 0 ? avg.toFixed(1) : '-'}
-                                </span>
+                               <div className="flex items-center gap-2">
+                                 {avg > 0 && (
+                                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${getScoreBgClass(avg, darkMode)}`}>
+                                     {getScoreLabel(avg)}
+                                   </span>
+                                 )}
+                                 <span className={`font-bold text-base ${avg > 0 ? getScoreColorClass(avg, darkMode) : 'text-slate-400'}`}>
+                                   {avg > 0 ? avg.toFixed(1) : '-'}
+                                 </span>
+                               </div>
                              </div>
                            );
                          })}
+                         </div>
                       </div>
                     )}
 
                     {/* Evaluator Comments */}
                     <div className="mt-6 space-y-3">
-                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Comentários dos Avaliadores</h4>
+                      <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                        <MessageCircle size={14} /> Comentários dos Avaliadores
+                      </h4>
                       {groupComments.length > 0 ? (
                         groupComments.map((comment) => {
                           const commentDate = new Date(comment.timestamp).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -1520,7 +1847,7 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
                         setSelectedGroupId(g.id);
                         setGroupComment('');
                     }}
-                    className={`text-left p-5 rounded-xl border transition-all shadow-sm hover:shadow-md active:scale-[0.98] ${
+                    className={`text-left p-5 rounded-xl border transition-all shadow-sm hover:shadow-md active:scale-[0.98] card-hover-lift ${
                       isEvaluated 
                         ? (darkMode ? 'bg-violet-500/15 border-violet-500/30' : 'bg-indigo-50 border-indigo-200') 
                         : (darkMode ? 'bg-slate-900 border-slate-800 ' + accentHoverBorder : 'bg-white border-slate-200 hover:border-indigo-300')
@@ -1580,57 +1907,137 @@ const EvaluationView = ({ events, activeEventId, setActiveEventId, groups, crite
 
           {/* Criteria */}
           <div>
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide px-1 mb-3">Critérios de Avaliação</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {criteria.map((criterion: Criterion) => (
-                <div key={criterion.id} className={`p-5 rounded-xl shadow-sm border flex flex-col justify-between ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide px-1 mb-1 flex items-center gap-2">
+              <Target size={16} /> Critérios de Avaliação
+            </h3>
+            <p className={`text-xs mb-3 px-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              Arraste o slider para dar nota. A cor indica a faixa: <span className="text-red-400">vermelho</span> ({'<'}4), <span className="text-amber-400">amarelo</span> (4-6), <span className="text-emerald-400">verde</span> (6-8), <span className="text-indigo-400">azul</span> (8+).
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 stagger-children">
+              {criteria.map((criterion: Criterion) => {
+                const currentScore = scores[criterion.id];
+                const hasScore = currentScore !== undefined && currentScore !== null;
+                const scoreColor = hasScore ? getScoreColorClass(currentScore, darkMode) : (darkMode ? 'text-slate-700' : 'text-slate-300');
+                const scoreBg = hasScore ? getScoreBgClass(currentScore, darkMode) : '';
+                
+                return (
+                <div key={criterion.id} className={`p-5 rounded-xl shadow-sm border flex flex-col justify-between animate-fade-in-up card-hover-lift ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                   <div className="mb-4">
                     <div className="flex justify-between items-start mb-2">
                       <h4 className={`font-bold text-lg leading-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>{criterion.name}</h4>
                       <button 
                         onClick={() => setActiveInfo(activeInfo === criterion.id ? null : criterion.id)}
-                        className={`p-1 rounded-full shrink-0 ${activeInfo === criterion.id ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-indigo-500'}`}
+                        className={`p-1.5 rounded-full shrink-0 transition-colors ${activeInfo === criterion.id ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300' : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10'}`}
+                        title="Ver descrição do critério"
                       >
                         <Info size={18} />
                       </button>
                     </div>
                     
                     {activeInfo === criterion.id && (
-                        <p className={`text-xs p-2 rounded mb-3 ${darkMode ? 'bg-indigo-900/30 text-indigo-300' : 'bg-indigo-50 text-indigo-700'}`}>
-                           {criterion.description}
-                        </p>
+                        <div className={`text-xs p-3 rounded-lg mb-3 border ${darkMode ? 'bg-indigo-900/20 border-indigo-500/20 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-700'}`}>
+                          <div className="flex items-start gap-2">
+                            <Lightbulb size={14} className="shrink-0 mt-0.5" />
+                            <p>{criterion.description}</p>
+                          </div>
+                        </div>
                     )}
-                    {!activeInfo && (
+                    {activeInfo !== criterion.id && (
                        <p className="text-xs text-slate-400 line-clamp-2">{criterion.description}</p>
                     )}
                   </div>
 
                   <div className="mt-auto">
                     <div className="flex justify-between items-center mb-2">
-                         <span className="text-xs font-bold text-slate-400 uppercase">Nota</span>
-                      <span className={`text-xl font-bold ${scores[criterion.id] !== undefined ? (darkMode ? 'text-violet-300' : 'text-indigo-600') : (darkMode ? 'text-slate-700' : 'text-slate-300')}`}>
-                            {scores[criterion.id] ?? '-'}
-                         </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase">Nota</span>
+                        {hasScore && (
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${scoreBg}`}>
+                            {getScoreLabel(currentScore)}
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-2xl font-bold transition-colors ${scoreColor}`}>
+                        {hasScore ? currentScore : '-'}
+                      </span>
                     </div>
                     <input 
                       type="range" 
                       min="0" 
                       max="10" 
                       step="0.5"
-                      className={`w-full h-3 rounded-lg appearance-none cursor-pointer ${darkMode ? 'accent-violet-400 bg-slate-800' : 'accent-indigo-600 bg-slate-100'}`}
+                      className={`w-full h-3 rounded-lg cursor-pointer`}
                       value={scores[criterion.id] ?? 0}
                       onChange={(e) => setScores({...scores, [criterion.id]: parseFloat(e.target.value)})}
                     />
                      <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
                         <span>0</span>
+                        <span>2.5</span>
                         <span>5</span>
+                        <span>7.5</span>
                         <span>10</span>
                      </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
                 </div>
           </div>
+
+          {/* Individual Member Scores */}
+          {selectedGroup.members.length > 0 && (
+            <div className={`p-5 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-2">
+                <Users size={16} /> Avaliação Individual
+              </h3>
+              <p className={`text-xs mb-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                Avalie cada integrante do grupo individualmente. Essa nota complementa a avaliação geral.
+              </p>
+              <div className="space-y-4">
+                {selectedGroup.members.map((member: Member) => {
+                  const memberScore = indivScores[member.id];
+                  const hasMemberScore = memberScore !== undefined && memberScore !== null;
+                  
+                  return (
+                    <div key={member.id} className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'}`}>
+                            {member.icon ? <DynamicIcon name={member.icon} size={16} /> : <User size={16} className="text-slate-400" />}
+                          </div>
+                          <span className={`font-semibold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{member.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {hasMemberScore && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${getScoreBgClass(memberScore, darkMode)}`}>
+                              {getScoreLabel(memberScore)}
+                            </span>
+                          )}
+                          <span className={`text-lg font-bold transition-colors ${hasMemberScore ? getScoreColorClass(memberScore, darkMode) : (darkMode ? 'text-slate-600' : 'text-slate-300')}`}>
+                            {hasMemberScore ? memberScore : '-'}
+                          </span>
+                        </div>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="10" 
+                        step="0.5"
+                        className="w-full h-2.5 rounded-lg cursor-pointer"
+                        value={indivScores[member.id] ?? 0}
+                        onChange={(e) => setIndivScores({...indivScores, [member.id]: parseFloat(e.target.value)})}
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
+                        <span>0</span>
+                        <span>5</span>
+                        <span>10</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Group Comments */}
           <div className={`p-5 rounded-xl shadow-sm border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
