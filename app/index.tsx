@@ -1416,7 +1416,6 @@ const DashboardView = ({ events, activeEventId, setActiveEventId, groups, evalua
                           <AnimatedBar key={c.id} value={avg} label={c.name} darkMode={darkMode} />
                         );
                       })}
-                      })}
                     </div>
 
                     {/* Individual Scores */}
